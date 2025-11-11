@@ -1,8 +1,8 @@
 <?php
 
 return [
-    // Terapkan CORS untuk semua endpoint API
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    // Terapkan CORS untuk API dan endpoint otorisasi broadcasting
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'broadcasting/*', 'broadcasting/auth'],
 
     // Izinkan semua method HTTP (GET, POST, PUT, DELETE, OPTIONS, dll)
     'allowed_methods' => ['*'],
@@ -11,7 +11,12 @@ return [
     'allowed_origins' => [
         'http://localhost:8080',
         'http://localhost:8081',
-        'http://localhost:51188',
+        'http://localhost:8090',
+        'http://localhost:8091',
+        'http://localhost:8092',
+        'http://localhost:8093',
+        'http://localhost:8094',
+        'http://localhost:8095',
     ],
 
     'allowed_origins_patterns' => [],

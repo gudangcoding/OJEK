@@ -16,7 +16,7 @@ class UserController extends Controller
         $data = $request->validate([
             'lat' => 'required|numeric',
             'lng' => 'required|numeric',
-            'status_job' => 'nullable|in:online,offline',
+            'status_job' => 'nullable|in:online,offline,active',
         ]);
 
         $user = $request->user();
@@ -28,5 +28,22 @@ class UserController extends Controller
         $user->save();
 
         return response()->noContent();
+    }
+
+    /**
+     * Update authenticated user's online status only.
+     * POST /api/me/status
+     */
+    public function updateStatus(Request $request)
+    {
+        $data = $request->validate([
+            'status_job' => 'required|in:online,offline,active',
+        ]);
+
+        $user = $request->user();
+        $user->status_job = $data['status_job'];
+        $user->save();
+
+        return response()->json(['status_job' => $user->status_job]);
     }
 }

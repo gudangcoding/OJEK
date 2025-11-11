@@ -1,5 +1,6 @@
 class AppConfig {
-  static const String apiBaseUrl = 'http://localhost:8000/api';
+  static const String apiBaseUrl = 'http://localhost:8000/api'; //lokal
+  // static const String apiBaseUrl = 'http://192.168.1.101:8000/api'; //online
   static const String pusherKey = '5ca9539b79ed4451bb0c';
   static const String pusherCluster = 'ap1';
 
@@ -8,6 +9,7 @@ class AppConfig {
 
   // Nearby drivers defaults
   static const double nearbyRadiusKm = 1.0;
+  static const double nearbyZoom = 20.0;
   static const int nearbyLimit = 20;
   // Auto refresh interval (seconds) for customers map on driver dashboard
   static const int nearbyCustomersRefreshSec = 30;

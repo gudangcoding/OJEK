@@ -3,6 +3,7 @@ import '../../services/api.dart';
 import '../../widget/form_input.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'bloc/register_bloc.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -18,40 +19,45 @@ class _RegisterPageState extends State<RegisterPage> {
   final _password = TextEditingController();
   String _role = 'customer';
   late final ApiService _api;
+  late final RegisterBloc _bloc;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
     _api = RepositoryProvider.of<ApiService>(context);
+    _bloc = RegisterBloc(apiService: _api);
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    try {
-      final user = await _api.register(_name.text.trim(), _email.text.trim(), _password.text, _role);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Registrasi berhasil')));
-      if (user.role.toLowerCase() == 'driver') {
-        if (!mounted) return;
-        context.go('/driver');
-      } else {
-        if (!mounted) return;
-        context.go('/customer');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registrasi gagal: $e')));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    _bloc.add(RegisterSubmitted(_name.text.trim(), _email.text.trim(), _password.text, _role));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Register')),
-      body: Padding(
+      body: BlocListener<RegisterBloc, RegisterState>(
+        bloc: _bloc,
+        listener: (context, state) {
+          if (state is RegisterLoading) {
+            setState(() => _loading = true);
+          } else {
+            setState(() => _loading = false);
+          }
+          if (state is RegisterSuccess) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('Registrasi berhasil')));
+            final role = state.role.toLowerCase();
+            context.go(role == 'driver' ? '/driver' : '/customer');
+          } else if (state is RegisterFailure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Registrasi gagal: ${state.message}')),
+            );
+          }
+        },
+        child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
@@ -90,6 +96,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

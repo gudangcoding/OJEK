@@ -9,11 +9,11 @@ class NearbyDriversWidget extends StatelessWidget {
   final double zoom;
 
   const NearbyDriversWidget({
-    Key? key,
+    super.key,
     required this.customerLocation,
     required this.drivers,
-    this.zoom = 15.0,
-  }) : super(key: key);
+    this.zoom = 20.0,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -51,21 +51,19 @@ class NearbyDriversWidget extends StatelessWidget {
                       ),
                     ),
                     // Marker semua driver
-                    ...drivers.map(
-                      (driver) {
-                        final online = driver['status_online'] == true;
-                        return Marker(
-                          point: LatLng(driver['lat'], driver['lng']),
-                          width: 40,
-                          height: 40,
-                          child: Icon(
-                            Icons.motorcycle,
-                            color: online ? Colors.green : Colors.grey,
-                            size: 32,
-                          ),
-                        );
-                      },
-                    ),
+                    ...drivers.map((driver) {
+                      final online = driver['status_online'] == true;
+                      return Marker(
+                        point: LatLng(driver['lat'], driver['lng']),
+                        width: 40,
+                        height: 40,
+                        child: Icon(
+                          Icons.motorcycle,
+                          color: online ? Colors.green : Colors.grey,
+                          size: 32,
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ],
@@ -99,17 +97,26 @@ class NearbyDriversWidget extends StatelessWidget {
                 ),
                 child: ListTile(
                   leading: driver['avatar_url'] != null
-                      ? CircleAvatar(backgroundImage: NetworkImage(driver['avatar_url']))
+                      ? CircleAvatar(
+                          backgroundImage: NetworkImage(driver['avatar_url']),
+                        )
                       : CircleAvatar(
                           backgroundColor: online ? Colors.green : Colors.grey,
-                          child: const Icon(Icons.motorcycle, color: Colors.white),
+                          child: const Icon(
+                            Icons.motorcycle,
+                            color: Colors.white,
+                          ),
                         ),
                   title: Text(driver['name'] ?? 'Driver'),
-                  subtitle: Text([
-                    '${km.toStringAsFixed(2)} km',
-                    if (plate != null && plate.toString().isNotEmpty) 'Plat: $plate',
-                    if (phone != null && phone.toString().isNotEmpty) 'Telp: $phone',
-                  ].join(' • ')),
+                  subtitle: Text(
+                    [
+                      '${km.toStringAsFixed(2)} km',
+                      if (plate != null && plate.toString().isNotEmpty)
+                        'Plat: $plate',
+                      if (phone != null && phone.toString().isNotEmpty)
+                        'Telp: $phone',
+                    ].join(' • '),
+                  ),
                   trailing: Icon(
                     Icons.circle,
                     size: 12,

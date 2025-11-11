@@ -28,7 +28,7 @@ class DriverController extends Controller
 
         $drivers = User::query()
             ->where('role', 'driver')
-            ->where('status_job', 'active')
+            ->whereIn('status_job', ['active','online'])
             ->whereNotNull('lat')
             ->whereNotNull('lng')
             ->get();
@@ -46,7 +46,7 @@ class DriverController extends Controller
                     'lat' => $dLat,
                     'lng' => $dLng,
                     'distance_km' => round($distance, 3),
-                    'status_online' => $d->status_job === 'active',
+                    'status_online' => in_array($d->status_job, ['active','online']),
                     'status_job' => $d->status_job,
                     'phone' => $d->phone,
                     // Optional fields if present in schema

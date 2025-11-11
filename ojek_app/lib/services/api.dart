@@ -7,9 +7,30 @@ import '../models/Order.dart';
 class ApiService {
   String? _token;
   String? get token => _token;
+  String? _role;
+  String? get role => _role;
+  int? _userId;
+  int? get userId => _userId;
+
+  // Menghapus token lokal tanpa memanggil backend
+  void clearToken() {
+    _token = null;
+    _role = null;
+  }
+
+  // Menyetel token/role dari storage saat startup
+  void setAuth(String token, {String? role}) {
+    _token = token;
+    if (role != null) _role = role;
+  }
+
+  void setRole(String role) {
+    _role = role;
+  }
 
   Map<String, String> _headers() => {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
@@ -26,6 +47,8 @@ class ApiService {
     final user = UserModel.fromJson(j['user']);
     final token = j['token'] as String;
     _token = token;
+    _role = user.role;
+    _userId = user.id;
     return (user, token);
   }
 
@@ -40,6 +63,8 @@ class ApiService {
     final user = UserModel.fromJson(j['user']);
     final token = j['token'];
     _token = token;
+    _role = role;
+    _userId = user.id;
     return user;
   }
 
@@ -100,6 +125,21 @@ class ApiService {
     return orders.where((o) => (o.driverId == null || o.driverId == 0) && o.status.toLowerCase() == 'pending').toList();
   }
 
+  // Mengambil order aktif yang sedang dijalankan oleh driver saat ini (bila ada)
+  Future<OrderModel?> getMyActiveOrder() async {
+    final myId = _userId;
+    if (myId == null) return null;
+    final orders = await listOrders();
+    // Anggap status selain 'completed' dan 'cancelled' masih aktif/berjalan
+    final active = orders.where((o) {
+      final s = o.status.toLowerCase();
+      return o.driverId == myId && s != 'completed' && s != 'cancelled';
+    }).toList();
+    if (active.isEmpty) return null;
+    // Ambil yang terbaru (anggap urutan dari backend sudah terbaru di depan)
+    return active.first;
+  }
+
   Future<OrderModel> acceptOrder(int orderId) async {
     final res = await http.post(Uri.parse('${AppConfig.apiBaseUrl}/orders/$orderId/accept'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Accept order failed: ${res.body}');
@@ -115,6 +155,17 @@ class ApiService {
   Future<void> completeOrder(int orderId) async {
     final res = await http.post(Uri.parse('${AppConfig.apiBaseUrl}/orders/$orderId/complete'), headers: _headers());
     if (res.statusCode != 200) throw Exception('Complete order failed: ${res.body}');
+  }
+
+  Future<OrderModel> cancelOrder(int orderId) async {
+    final res = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/orders/$orderId/cancel'),
+      headers: _headers(),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Cancel order failed: ${res.body}');
+    }
+    return OrderModel.fromJson(jsonDecode(res.body));
   }
 
   Future<List<Map<String, dynamic>>> listNearbyDrivers(double lat, double lng, {double radiusKm = 5, int limit = 20}) async {
@@ -178,6 +229,32 @@ class ApiService {
     );
     if (res.statusCode != 204) {
       throw Exception('Update my location failed: ${res.body}');
+    }
+  }
+
+  Future<void> updateMyStatus(String statusJob) async {
+    final res = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/me/status'),
+      headers: _headers(),
+      body: jsonEncode({'status_job': statusJob}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('Update my status failed: ${res.body}');
+    }
+    try {
+      final j = jsonDecode(res.body);
+      // Optionally keep role or other fields; for now ignore
+    } catch (_) {}
+  }
+
+  Future<void> updateOrderLocation(int orderId, double lat, double lng) async {
+    final res = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/orders/$orderId/location'),
+      headers: _headers(),
+      body: jsonEncode({'lat': lat, 'lng': lng}),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) {
+      throw Exception('Update order location failed: ${res.body}');
     }
   }
 }

@@ -4,6 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\DriverLocationUpdated;
 use App\Events\OrderCreated;
+use App\Events\OrderOffer;
+use App\Events\OrderAccepted;
+use App\Events\OrderCompleted;
+use App\Events\OrderCancelled;
+use App\Events\OrderUpdate;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use Illuminate\Http\Request;
@@ -20,8 +25,11 @@ class OrderController extends Controller
         if ($user && $user->role === 'customer') {
             $orders = Order::where('customer_id', $user->id)->orderByDesc('id')->get();
         } else if ($user && $user->role === 'driver') {
-            // For drivers, return all orders (frontend will filter pending/available)
-            $orders = Order::orderByDesc('id')->get();
+            // For drivers, only return orders that are pending and unassigned
+            $orders = Order::where('status', 'pending')
+                ->whereNull('driver_id')
+                ->orderByDesc('id')
+                ->get();
         } else {
             $orders = Order::orderByDesc('id')->get();
         }
@@ -56,7 +64,48 @@ class OrderController extends Controller
             'status' => 'pending',
         ]);
 
-        OrderCreated::dispatch($order);
+        // Broadcast publik tetap ada untuk kompatibilitas, namun tambahkan
+        // targeted broadcast ke driver terpilih via channel privat per-user.
+        try {
+            OrderCreated::dispatch($order);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast OrderCreated failed: ' . $e->getMessage());
+        }
+
+        // Pilih driver terdekat yang online/active/idle dalam radius tertentu,
+        // kemudian ambil subset acak untuk broadcast targeted.
+        try {
+            $lat = (float) $order->lat_pickup;
+            $lng = (float) $order->lon_pickup;
+            $radiusKm = 1.0; // radius sesuai permintaan: 1 km
+            $limit = 50;     // ambil kandidat maksimal
+            $sampleCount = 8; // jumlah driver yang menerima offer
+
+            $haversine = "(6371 * acos(cos(radians(?)) * cos(radians(users.lat)) * cos(radians(users.lng) - radians(?)) + sin(radians(?)) * sin(radians(users.lat))))";
+
+            $candidates = \Illuminate\Support\Facades\DB::table('users')
+                ->select(['users.id'])
+                ->selectRaw($haversine . ' AS distance_km', [$lat, $lng, $lat])
+                ->where('users.role', '=', 'driver')
+                ->whereIn('users.status_job', ['active','online','idle'])
+                ->whereNotNull('users.lat')
+                ->whereNotNull('users.lng')
+                ->havingRaw('distance_km <= ?', [$radiusKm])
+                ->orderBy('distance_km', 'asc')
+                ->limit($limit)
+                ->get();
+
+            $ids = $candidates->pluck('id')->map(fn($v) => (int) $v)->toArray();
+            // Acak dan ambil sejumlah sample
+            shuffle($ids);
+            $targetIds = array_slice($ids, 0, min($sampleCount, count($ids)));
+
+            if (!empty($targetIds)) {
+                OrderOffer::dispatch($order, $targetIds);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast targeted OrderOffer failed: ' . $e->getMessage());
+        }
 
         return response()->json($order, 201);
     }
@@ -68,7 +117,11 @@ class OrderController extends Controller
             'lng' => 'required|numeric',
         ]);
 
-        DriverLocationUpdated::dispatch($order, (float) $data['lat'], (float) $data['lng']);
+        try {
+            DriverLocationUpdated::dispatch($order, (float) $data['lat'], (float) $data['lng']);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast DriverLocationUpdated failed: ' . $e->getMessage());
+        }
 
         return response()->noContent();
     }
@@ -85,6 +138,43 @@ class OrderController extends Controller
         $order->driver_id = $user->id;
         $order->status = 'accepted';
         $order->save();
+        try {
+            OrderAccepted::dispatch($order);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast OrderAccepted failed: ' . $e->getMessage());
+        }
+        // Targeted notify ke driver sekitar untuk menutup modal mereka
+        try {
+            $lat = (float) $order->lat_pickup;
+            $lng = (float) $order->lon_pickup;
+            $radiusKm = 1.0;
+            $limit = 50;
+            $sampleCount = 8;
+
+            $haversine = "(6371 * acos(cos(radians(?)) * cos(radians(users.lat)) * cos(radians(users.lng) - radians(?)) + sin(radians(?)) * sin(radians(users.lat))))";
+
+            $candidates = \Illuminate\Support\Facades\DB::table('users')
+                ->select(['users.id'])
+                ->selectRaw($haversine . ' AS distance_km', [$lat, $lng, $lat])
+                ->where('users.role', '=', 'driver')
+                ->whereIn('users.status_job', ['active','online','idle'])
+                ->whereNotNull('users.lat')
+                ->whereNotNull('users.lng')
+                ->havingRaw('distance_km <= ?', [$radiusKm])
+                ->orderBy('distance_km', 'asc')
+                ->limit($limit)
+                ->get();
+
+            $ids = $candidates->pluck('id')->map(fn($v) => (int) $v)->toArray();
+            shuffle($ids);
+            $targetIds = array_slice($ids, 0, min($sampleCount, count($ids)));
+
+            if (!empty($targetIds)) {
+                OrderUpdate::dispatch($order, $targetIds, 'accepted');
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast targeted OrderUpdate (accepted) failed: ' . $e->getMessage());
+        }
         return response()->json($order);
     }
 
@@ -99,6 +189,44 @@ class OrderController extends Controller
             $order->driver_id = null;
             $order->status = 'pending';
             $order->save();
+            // Siarkan ulang ke customer via channel privat order
+            try {
+                OrderCreated::dispatch($order);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Broadcast OrderCreated (after reject) failed: ' . $e->getMessage());
+            }
+            // Lakukan targeted broadcast ke driver terdekat agar order kembali ditawarkan
+            try {
+                $lat = (float) $order->lat_pickup;
+                $lng = (float) $order->lon_pickup;
+                $radiusKm = 1.0;
+                $limit = 50;
+                $sampleCount = 8;
+
+                $haversine = "(6371 * acos(cos(radians(?)) * cos(radians(users.lat)) * cos(radians(users.lng) - radians(?)) + sin(radians(?)) * sin(radians(users.lat))))";
+
+                $candidates = \Illuminate\Support\Facades\DB::table('users')
+                    ->select(['users.id'])
+                    ->selectRaw($haversine . ' AS distance_km', [$lat, $lng, $lat])
+                    ->where('users.role', '=', 'driver')
+                    ->whereIn('users.status_job', ['active','online','idle'])
+                    ->whereNotNull('users.lat')
+                    ->whereNotNull('users.lng')
+                    ->havingRaw('distance_km <= ?', [$radiusKm])
+                    ->orderBy('distance_km', 'asc')
+                    ->limit($limit)
+                    ->get();
+
+                $ids = $candidates->pluck('id')->map(fn($v) => (int) $v)->toArray();
+                shuffle($ids);
+                $targetIds = array_slice($ids, 0, min($sampleCount, count($ids)));
+
+                if (!empty($targetIds)) {
+                    OrderOffer::dispatch($order, $targetIds);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Broadcast targeted OrderOffer (after reject) failed: ' . $e->getMessage());
+            }
         }
         return response()->json($order);
     }
@@ -112,8 +240,132 @@ class OrderController extends Controller
         if ($order->driver_id !== $user->id) {
             return response()->json(['message' => 'Not your order'], 403);
         }
-        $order->status = 'completed';
+        // Gunakan nilai enum yang tersedia pada kolom status: pending, accepted, rejected, done
+        $order->status = 'done';
         $order->save();
+        // Update driver status to idle after completing the order
+        // Simpan juga status_job pada user agar konsisten dengan filter "nearby" dan broadcast
+        try {
+            $user->status_job = 'idle';
+            $user->save();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Set user.status_job idle failed: ' . $e->getMessage());
+        }
+        $driver = $user->driver;
+        if ($driver) {
+            $driver->update(['status' => 'idle']);
+        }
+        try {
+            OrderCompleted::dispatch($order);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast OrderCompleted failed: ' . $e->getMessage());
+        }
+        // Targeted notify ke driver sekitar untuk menutup modal mereka
+        try {
+            $lat = (float) $order->lat_pickup;
+            $lng = (float) $order->lon_pickup;
+            $radiusKm = 1.0;
+            $limit = 50;
+            $sampleCount = 8;
+
+            $haversine = "(6371 * acos(cos(radians(?)) * cos(radians(users.lat)) * cos(radians(users.lng) - radians(?)) + sin(radians(?)) * sin(radians(users.lat))))";
+
+            $candidates = \Illuminate\Support\Facades\DB::table('users')
+                ->select(['users.id'])
+                ->selectRaw($haversine . ' AS distance_km', [$lat, $lng, $lat])
+                ->where('users.role', '=', 'driver')
+                ->whereIn('users.status_job', ['active','online','idle'])
+                ->whereNotNull('users.lat')
+                ->whereNotNull('users.lng')
+                ->havingRaw('distance_km <= ?', [$radiusKm])
+                ->orderBy('distance_km', 'asc')
+                ->limit($limit)
+                ->get();
+
+            $ids = $candidates->pluck('id')->map(fn($v) => (int) $v)->toArray();
+            shuffle($ids);
+            $targetIds = array_slice($ids, 0, min($sampleCount, count($ids)));
+
+            if (!empty($targetIds)) {
+                OrderUpdate::dispatch($order, $targetIds, 'completed');
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast targeted OrderUpdate (completed) failed: ' . $e->getMessage());
+        }
+        return response()->json($order);
+    }
+
+    public function cancel(Request $request, Order $order)
+    {
+        $user = $request->user();
+        if (!$user || $user->role !== 'customer') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+        if ($order->customer_id !== $user->id) {
+            return response()->json(['message' => 'Not your order'], 403);
+        }
+        // Hanya izinkan cancel jika order belum di-accept oleh driver
+        if ($order->status !== 'pending' || ($order->driver_id && $order->driver_id > 0)) {
+            return response()->json(['message' => 'Order already processed'], 422);
+        }
+        // Gunakan nilai enum yang tersedia pada kolom status
+        // (pending, accepted, rejected, done)
+        $order->status = 'rejected';
+        $order->save();
+        // Jika order dibatalkan oleh customer dari status pending, pastikan driver (jika ada) kembali idle
+        try {
+            if ($order->driver_id) {
+                // Muat ulang user driver dan set status_job ke idle
+                $driverUser = \App\Models\User::find($order->driver_id);
+                if ($driverUser) {
+                    $driverUser->status_job = 'idle';
+                    $driverUser->save();
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Set driver user.status_job idle after cancel failed: ' . $e->getMessage());
+        }
+         $driver = $user->driver;
+        if ($driver) {
+            $driver->update(['status' => 'idle']);
+        }
+        try {
+            OrderCancelled::dispatch($order);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast OrderCancelled failed: ' . $e->getMessage());
+        }
+        // Targeted notify ke driver sekitar untuk menutup modal mereka
+        try {
+            $lat = (float) $order->lat_pickup;
+            $lng = (float) $order->lon_pickup;
+            $radiusKm = 1.0;
+            $limit = 50;
+            $sampleCount = 8;
+
+            $haversine = "(6371 * acos(cos(radians(?)) * cos(radians(users.lat)) * cos(radians(users.lng) - radians(?)) + sin(radians(?)) * sin(radians(users.lat))))";
+
+            $candidates = \Illuminate\Support\Facades\DB::table('users')
+                ->select(['users.id'])
+                ->selectRaw($haversine . ' AS distance_km', [$lat, $lng, $lat])
+                ->where('users.role', '=', 'driver')
+                ->whereIn('users.status_job', ['active','online','idle'])
+                ->whereNotNull('users.lat')
+                ->whereNotNull('users.lng')
+                ->havingRaw('distance_km <= ?', [$radiusKm])
+                ->orderBy('distance_km', 'asc')
+                ->limit($limit)
+                ->get();
+
+            $ids = $candidates->pluck('id')->map(fn($v) => (int) $v)->toArray();
+            shuffle($ids);
+            $targetIds = array_slice($ids, 0, min($sampleCount, count($ids)));
+
+            if (!empty($targetIds)) {
+                OrderUpdate::dispatch($order, $targetIds, 'cancelled');
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Broadcast targeted OrderUpdate (cancelled) failed: ' . $e->getMessage());
+        }
         return response()->json($order);
     }
 }

@@ -22,7 +22,7 @@ return new class extends Migration
             $table->float('lat')->nullable();
             $table->float('lng')->nullable();
             $table->float('distance')->nullable();
-            $table->enum('status_job', ['online','offline','active'])->default('online');
+            $table->enum('status_job', ['online','offline','active','idle'])->default('online');
             $table->enum('status_online', ['online','offline','active'])->default('online');
             $table->string('foto')->nullable();
             $table->string('vehicle_plate')->nullable();

@@ -1,7 +1,8 @@
 <?php
 
 return [
-    'default' => env('BROADCAST_DRIVER', 'log'),
+    // Default ke 'pusher' agar event realtime dikirim ke Pusher bila env tidak diset
+    'default' => env('BROADCAST_DRIVER', 'pusher'),
 
     'connections' => [
         'pusher' => [
@@ -10,10 +11,8 @@ return [
             'secret' => env('PUSHER_APP_SECRET'),
             'app_id' => env('PUSHER_APP_ID'),
             'options' => [
-                'host' => env('PUSHER_HOST', 'api-01.pusher.com'),
-                'port' => env('PUSHER_PORT', 443),
-                'scheme' => env('PUSHER_SCHEME', 'https'),
-                'encrypted' => true,
+                // Biarkan Laravel dan SDK menentukan host berdasarkan cluster
+                // Menghindari host override yang bisa menyebabkan broadcast gagal
                 'useTLS' => env('PUSHER_USE_TLS', true),
                 'cluster' => env('PUSHER_APP_CLUSTER'),
             ],

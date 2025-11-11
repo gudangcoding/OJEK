@@ -24,16 +24,29 @@ class DatabaseSeeder extends Seeder
 
         // Create customer user
         User::factory()->create([
-            'name' => 'Customer',
+            'name' => 'Customer 1',
             'email' => 'a@a.com',
+            'password'=> bcrypt('123456'),
+            'role' => 'customer',
+        ]);
+        
+        User::factory()->create([
+            'name' => 'Customer 2',
+            'email' => 'b@b.com',
             'password'=> bcrypt('123456'),
             'role' => 'customer',
         ]);
 
         // Create driver user
         User::factory()->create([
-            'name' => 'Driver',
-            'email' => 'b@b.com',
+            'name' => 'Driver 1',
+            'email' => 'c@c.com',
+            'password'=> bcrypt('123456'),
+            'role' => 'driver',
+        ]);
+        User::factory()->create([
+            'name' => 'Driver 2',
+            'email' => 'd@d.com',
             'password'=> bcrypt('123456'),
             'role' => 'driver',
         ]);

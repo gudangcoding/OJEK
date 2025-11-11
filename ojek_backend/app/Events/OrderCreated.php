@@ -19,7 +19,10 @@ class OrderCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('orders.' . $this->order->id)];
+        // Hanya ke channel privat khusus order (publik dinonaktifkan)
+        return [
+            new PrivateChannel('orders.' . $this->order->id),
+        ];
     }
 
     public function broadcastAs(): string
@@ -33,7 +36,14 @@ class OrderCreated implements ShouldBroadcastNow
             'id' => $this->order->id,
             'customer_id' => $this->order->customer_id,
             'driver_id' => $this->order->driver_id,
-            'address' => $this->order->address,
+            'lat_pickup' => $this->order->lat_pickup,
+            'lon_pickup' => $this->order->lon_pickup,
+            'pickup_address' => $this->order->pickup_address,
+            'lat_dropoff' => $this->order->lat_dropoff,
+            'lon_dropoff' => $this->order->lon_dropoff,
+            'dropoff_address' => $this->order->dropoff_address,
+            'total_price' => $this->order->total_price,
+            'distance' => $this->order->distance,
             'status' => $this->order->status,
         ];
     }

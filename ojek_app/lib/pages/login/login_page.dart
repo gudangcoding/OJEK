@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api.dart';
+import '../../services/auth_storage.dart';
+import 'bloc/login_bloc.dart';
 import '../../widget/form_input.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,39 +18,43 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   late final ApiService _api;
+  late final LoginBloc _bloc;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
     _api = RepositoryProvider.of<ApiService>(context);
+    _bloc = LoginBloc(apiService: _api);
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
-    try {
-      final (user, _) = await _api.login(_email.text.trim(), _password.text);
-      if (!mounted) return;
-      if (user.role.toLowerCase() == 'driver') {
-        if (!mounted) return;
-        context.go('/driver');
-      } else {
-        if (!mounted) return;
-        context.go('/customer');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login gagal: $e')));
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    _bloc.add(LoginSubmitted(_email.text.trim(), _password.text));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
-      body: Padding(
+      body: BlocListener<LoginBloc, LoginState>(
+        bloc: _bloc,
+        listener: (context, state) {
+          if (state is LoginLoading) {
+            setState(() => _loading = true);
+          } else {
+            setState(() => _loading = false);
+          }
+          if (state is LoginSuccess) {
+            final role = state.role.toLowerCase();
+            context.go(role == 'driver' ? '/driver' : '/customer');
+          } else if (state is LoginFailure) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Login gagal: ${state.message}')),
+            );
+          }
+        },
+        child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
@@ -77,6 +83,7 @@ class _LoginPageState extends State<LoginPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

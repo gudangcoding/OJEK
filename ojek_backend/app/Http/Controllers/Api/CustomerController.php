@@ -41,25 +41,26 @@ class CustomerController extends Controller
                 'users.lng',
                 'users.phone',
                 'users.status_job',
-                DB::raw($haversine . ' AS distance_km'),
                 // Optional enriched fields
                 'users.avatar_url',
                 'users.vehicle_plate',
                 'users.vehicle_model',
                 'users.rating',
             ])
+            // Bind the Haversine raw select with its own bindings
+            ->selectRaw($haversine . ' AS distance_km', [$lat, $lng, $lat])
             ->whereNotNull('users.lat')
             ->whereNotNull('users.lng')
             ->where('users.role', '=', 'customer')
-            ->where(function ($q) {
-                // Consider online when status_job is active
-                $q->where('users.status_job', '=', 'active');
-            })
-            ->having('distance_km', '<=', $radiusKm)
+            // Consider online when status_job is 'active' or 'online'
+            ->whereIn('users.status_job', ['active','online'])
+            // Use havingRaw to bind the radius parameter without interfering other bindings
+            ->havingRaw('distance_km <= ?', [$radiusKm])
             ->orderBy('distance_km', 'asc')
             ->limit($limit);
 
-        $customers = $query->setBindings([$lat, $lng, $lat])->get();
+        // Do not override bindings; query builder manages them correctly
+        $customers = $query->get();
 
         $payload = $customers->map(function ($c) {
             return [
@@ -69,7 +70,7 @@ class CustomerController extends Controller
                 'lng' => $c->lng,
                 'distance_km' => round($c->distance_km, 3),
                 'status_job' => $c->status_job,
-                'status_online' => $c->status_job === 'active',
+                'status_online' => in_array($c->status_job, ['active','online']),
                 'phone' => $c->phone,
                 // Optional fields if exist
                 'avatar_url' => $c->avatar_url ?? null,

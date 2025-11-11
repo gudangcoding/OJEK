@@ -3,6 +3,8 @@
 Dibuat oleh LKP Naura — Kursus Komputer Bersertifikat
 Website: https://lkpnaura.com
 
+Catatan: Bagi yang mengunduh proyek ini, mohon beri star (⭐).
+
 Proyek ini adalah aplikasi ojek sederhana dengan dua peran utama: `customer` (pemesan) dan `driver` (pengemudi). Frontend dibangun dengan Flutter (`ojek_app`) dan backend dengan Laravel (`ojek_backend`). Aplikasi mendukung pemesanan, penawaran driver di sekitar, pembaruan lokasi driver secara realtime, serta alur status order (dibuat, diterima, dibatalkan, selesai).
 
 ![Beranda Customer](./customer.png)
@@ -109,6 +111,34 @@ Ilustrasi:
       });
   ```
 - Jika halaman docs tidak muncul, pastikan paket `dedoc/scramble` terpasang, service provider aktif, dan environment pengembangan berjalan pada `http://localhost:8000`.
+
+## Contoh Login & Token
+- Request login (ambil token):
+  ```bash
+  curl -X POST http://localhost:8000/api/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"user@example.com","password":"password"}'
+  ```
+- Contoh response:
+  ```json
+  {
+    "user": {
+      "id": 1,
+      "name": "User",
+      "email": "user@example.com",
+      "role": "customer"
+    },
+    "token": "<SANCTUM_TOKEN>"
+  }
+  ```
+- Gunakan token untuk endpoint terlindungi (Authorization header dengan awalan `Bearer`):
+  ```bash
+  curl -X POST http://localhost:8000/api/me/location \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <SANCTUM_TOKEN>" \
+    -d '{"lat":-7.8,"lng":110.4,"status_job":"idle"}'
+  ```
+- Di halaman docs (Scramble), klik `Authorize`, pilih `bearer`, lalu tempel isi token tanpa kata "Bearer".
 
 ## Struktur Modul
 

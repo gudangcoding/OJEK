@@ -1,6 +1,11 @@
 # Ojek App — Flutter + Laravel (Realtime Order)
 
+Dibuat oleh LKP Naura — Kursus Komputer Bersertifikat
+Website: https://lkpnaura.com
+
 Proyek ini adalah aplikasi ojek sederhana dengan dua peran utama: `customer` (pemesan) dan `driver` (pengemudi). Frontend dibangun dengan Flutter (`ojek_app`) dan backend dengan Laravel (`ojek_backend`). Aplikasi mendukung pemesanan, penawaran driver di sekitar, pembaruan lokasi driver secara realtime, serta alur status order (dibuat, diterima, dibatalkan, selesai).
+
+![Beranda Customer](./customer.png)
 
 ## Fitur Utama
 - Pemesanan perjalanan oleh customer, estimasi jarak dan harga.
@@ -14,6 +19,32 @@ Proyek ini adalah aplikasi ojek sederhana dengan dua peran utama: `customer` (pe
 - `ojek_app/` — Aplikasi Flutter (Android/iOS/web/desktop).
 - `ojek_backend/` — Aplikasi Laravel (API, broadcasting, events, models).
 - Berkas gambar dokumentasi berada di root proyek.
+
+## Alur Lengkap
+
+**Customer Flow**
+- Login/registrasi sebagai `customer`.
+- Tentukan titik `pickup` dan `dropoff`, lihat `estimasi` jarak dan harga.
+- Tekan `Order` untuk membuat order baru; dialog menunggu muncul.
+- Saat driver `accepted`, dialog menutup dan diarahkan ke halaman rute, lokasi driver dipantau realtime.
+- `completed` menutup rute dan menampilkan notifikasi selesai; `cancelled` menutup dialog dan reset state.
+
+**Driver Flow**
+- Login sebagai `driver` dan aktifkan status `online/active`.
+- Menerima broadcast order baru (publik) atau penawaran tertarget (privat) di sekitar.
+- Modal order muncul; dapat `accept` atau `reject`.
+- `accept` mengikat order dan menyiarkan ke customer; driver mengirim lokasi berkala.
+- `completed` menutup modal dan mengubah status ke `idle`; `cancelled` mengembalikan ketersediaan.
+
+Ilustrasi:
+
+![Estimasi Perjalanan](./estimasi.png)
+
+![Cari Driver](./cari%20driver.png)
+
+![Order Masuk (Driver)](./order%20masuk.png)
+
+![Radius Customer](./Customer%20Radius.png)
 
 ## Prasyarat
 - Flutter 3.x dan Dart SDK.
@@ -67,6 +98,25 @@ Proyek ini adalah aplikasi ojek sederhana dengan dua peran utama: `customer` (pe
 - Driver juga menerima penawaran tertarget via kanal privat `private-users.{id}` (opsional/configurable).
 - Frontend berlangganan kanal melalui `BroadcastService`/`RealtimeService` dan menggunakan token Bearer untuk authorizer.
 
+## Struktur Modul
+
+**Frontend (Flutter `ojek_app/lib`)**
+- `services/api.dart` — HTTP API client, token/role/userId.
+- `services/broadcast.dart` — Pusher wrapper (publik dan privat), langganan event order.
+- `services/realtime.dart` — Alternatif wrapper realtime (publik/privat, lokasi driver).
+- `pages/customer/customer_page.dart` — Booking, dialog menunggu, subscribe order & lokasi.
+- `pages/customer/customer_route_page.dart` — Tampilan rute dan tracking driver.
+- `pages/driver/driver_page.dart` — Langganan broadcast, modal order, aksi accept/reject.
+- `pages/customer_order/bloc/` — State management order customer.
+
+**Backend (Laravel `ojek_backend/app`)**
+- `Http/Controllers/Api/OrderController.php` — CRUD order, accept/reject, broadcast.
+- `Http/Controllers/Api/UserController.php` — Lokasi user, status job (`online/offline/active/idle`).
+- `Events/` — `OrderCreated`, `OrderAccepted`, `OrderCancelled`, `OrderCompleted`, `OrderUpdate`, `DriverLocationUpdated`.
+- `routes/api.php` — Definisi endpoint API.
+- `routes/channels.php` — Kanal broadcast privat/publik.
+- `config/broadcasting.php` — Konfigurasi driver broadcast (Pusher).
+
 ## Endpoint Penting (contoh)
 - `POST /api/login` — Login dan menerima token Sanctum.
 - `POST /api/register` — Registrasi user baru (role: `customer`/`driver`).
@@ -92,6 +142,14 @@ Proyek ini adalah aplikasi ojek sederhana dengan dua peran utama: `customer` (pe
 - Jika dialog menunggu pada halaman customer tidak tertutup saat order diterima, pastikan event `accepted` diterima di kanal publik `orders` atau kanal privat `private-orders.{id}` dan periksa konfigurasi Pusher/token.
 - Nilai `status_job` sudah diperluas untuk mendukung `idle` agar sinkron dengan alur driver.
 - Untuk mengubah mode broadcast (publik vs privat tertarget), sesuaikan event di `ojek_backend/app/Events/` dan langganan di `ojek_app/lib/services/broadcast.dart`.
+
+## Cara Uji Alur (Quick Test)
+- Jalankan backend (`php artisan serve`) dan frontend (`flutter run`).
+- Login sebagai `customer`, buat order; pastikan dialog menunggu muncul.
+- Login sebagai `driver` kedua (atau perangkat lain), terima order.
+- Pastikan pada customer, dialog tertutup, snackbar muncul, dan halaman rute terbuka.
+- Gerakkan lokasi driver (API `me/location`) dan cek peta customer mengikuti driver.
+- Selesaikan order; pastikan event `completed` menutup alur dengan benar.
 
 ---
 Silakan sesuaikan README ini jika Anda menambah fitur atau mengubah alur kerja. Jika ada gambar tambahan di root, tambahkan dengan format:

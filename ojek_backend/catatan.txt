@@ -1,0 +1,14 @@
+1. composer create-project laravel/laravel ojek_backend
+2. cd ojek_backend
+3. composer require -W --dev laravel-shift/blueprint
+4. Php artisan blueprint:new (untuk membuat file draft.yaml)
+5. Php artisan blueprint:build (untuk membuat file migration, skema,factory,seeder,test)
+6. Php artisan blueprint:erase 
+7. composer require filament/filament
+8. php artisan filament:install –panels
+9. php artisan make:filament-user
+10. php artisan make:filament-resource Customer –generate
+11. php artisan make:filament-relation-manager OrderResource Customer
+12. php artisan make:filament-relation-manager OrderResource Driver
+13. composer require pusher/pusher-php-server
+14. composer require dedoc/scramble

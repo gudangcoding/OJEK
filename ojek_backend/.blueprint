@@ -1,0 +1,13 @@
+created:
+    - app/Http/Controllers/Api/AuthController.php
+    - app/Http/Controllers/Api/OrderController.php
+    - database/factories/OrderFactory.php
+    - database/migrations/2025_11_10_110426_create_orders_table.php
+    - app/Models/Order.php
+    - tests/Feature/Http/Controllers/Api/AuthControllerTest.php
+    - tests/Feature/Http/Controllers/Api/OrderControllerTest.php
+updated:
+    - routes/api.php
+models:
+    User: { name: string, email: string, email_verified_at: 'datetime nullable', password: string, remember_token: 'string nullable' }
+    Order: { customer_id: 'id:foreign:users', driver_id: 'id:foreign:users', address: string, status: 'enum:pending,accepted,done default:pending' }

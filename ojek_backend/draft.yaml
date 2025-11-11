@@ -1,0 +1,39 @@
+models:
+  Order:
+    customer_id: id:foreign:users
+    lat_pickup: float
+    lon_pickup: float
+    customer_address: string
+    driver_id: id:foreign:users nullable
+    lat_dropoff: float
+    lon_dropoff: float
+    address: string
+    total_price: double
+    distance: double
+    status: enum:pending,accepted,rejected,done default:pending
+    status_job: enum:active,non-active default:active
+
+controllers:
+  Api/AuthController:
+    resource: api.login,api.register
+    register:
+      request: name, email, password, role
+      respond: User
+    login:
+      request: email, password
+      respond: token, role
+    logout:
+      middleware: auth:sanctum
+      respond: message
+
+  Api/OrderController:
+    resource: api.index, api.store
+    index:
+      middleware: auth:sanctum
+      respond: Order[]
+    store:
+      middleware: auth:sanctum
+      request: address
+      save: order
+      fire: "OrderCreated with: order"
+      respond: Order

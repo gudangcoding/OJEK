@@ -129,6 +129,7 @@ class _CustomerPageState extends State<CustomerPage>
   OrderModel? _activeOrderModel;
   bool _waitingDialogOpen = false;
   bool _waitingDialogPendingClose = false;
+  bool _navigatedToRoute = false;
   late final CustomerBloc _customerBloc;
 
   @override
@@ -626,6 +627,7 @@ class _CustomerPageState extends State<CustomerPage>
             _orderPlaced = true;
             _activeOrderId = state.order.id;
             _activeOrderModel = state.order;
+            _navigatedToRoute = false;
           });
           // Subscribe to realtime order updates
           await _rt.subscribeOrderDetail(state.order.id, (evt) {
@@ -643,12 +645,17 @@ class _CustomerPageState extends State<CustomerPage>
                 ),
               );
               // Redirect customer ke halaman rute perjalanan
-              if (_activeOrderModel != null) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CustomerRoutePage(order: _activeOrderModel!),
-                  ),
-                );
+              if (!_navigatedToRoute && _activeOrderModel != null) {
+                _navigatedToRoute = true;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  try {
+                    Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (_) => CustomerRoutePage(order: _activeOrderModel!),
+                      ),
+                    );
+                  } catch (_) {}
+                });
               }
             } else if (t == 'rejected') {
               ScaffoldMessenger.of(context).showSnackBar(

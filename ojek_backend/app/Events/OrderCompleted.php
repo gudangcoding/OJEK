@@ -20,7 +20,9 @@ class OrderCompleted implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        // Dual broadcast: publik 'orders' untuk driver, privat 'orders.{id}' untuk customer
         return [
+            new Channel('orders'),
             new PrivateChannel('orders.' . $this->order->id),
         ];
     }

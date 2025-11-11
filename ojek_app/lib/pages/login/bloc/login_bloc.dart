@@ -18,7 +18,7 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     emit(LoginLoading());
     try {
       final (user, token) = await api.login(e.email.trim(), e.password);
-      await AuthStorage.saveAuth(token: token, role: user.role);
+      await AuthStorage.saveAuth(token: token, role: user.role, userId: user.id);
       emit(LoginSuccess(user.role));
     } catch (err) {
       emit(LoginFailure(err.toString()));

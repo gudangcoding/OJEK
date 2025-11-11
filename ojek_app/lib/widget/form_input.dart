@@ -50,7 +50,7 @@ class RoleDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       items: const [
         DropdownMenuItem(value: 'customer', child: Text('Customer')),
         DropdownMenuItem(value: 'driver', child: Text('Driver')),

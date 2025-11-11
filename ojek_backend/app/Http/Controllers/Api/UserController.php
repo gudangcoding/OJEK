@@ -16,7 +16,8 @@ class UserController extends Controller
         $data = $request->validate([
             'lat' => 'required|numeric',
             'lng' => 'required|numeric',
-            'status_job' => 'nullable|in:online,offline,active',
+            // Allow 'idle' to represent ready-but-not-on-a-trip state
+            'status_job' => 'nullable|in:online,offline,active,idle',
         ]);
 
         $user = $request->user();
@@ -37,7 +38,8 @@ class UserController extends Controller
     public function updateStatus(Request $request)
     {
         $data = $request->validate([
-            'status_job' => 'required|in:online,offline,active',
+            // Accept 'idle' as a valid status when driver finishes an order
+            'status_job' => 'required|in:online,offline,active,idle',
         ]);
 
         $user = $request->user();

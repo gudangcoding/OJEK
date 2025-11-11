@@ -71,6 +71,15 @@ class _DriverPageState extends State<DriverPage> with TickerProviderStateMixin {
   }
 
   void _subscribeToOrders() async {
+    // Pastikan token dan userId telah siap; jika userId belum ada (startup dari storage lama), coba load dari storage
+    if (_api.userId == null) {
+      try {
+        final storedId = await AuthStorage.getUserId();
+        if (storedId != null) {
+          _api.setUserId(storedId);
+        }
+      } catch (_) {}
+    }
     await _broadcast.subscribeOrders(
       (evt) {
         if (!mounted) return;

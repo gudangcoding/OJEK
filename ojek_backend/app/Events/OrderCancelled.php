@@ -20,8 +20,9 @@ class OrderCancelled implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        // Hanya channel private order untuk customer (publik dinonaktifkan)
+        // Dual broadcast: publik 'orders' untuk semua driver, privat 'orders.{id}' untuk customer
         return [
+            new Channel('orders'),
             new PrivateChannel('orders.' . $this->order->id),
         ];
     }

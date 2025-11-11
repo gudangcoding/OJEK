@@ -5,6 +5,7 @@ namespace App\Events;
 use App\Models\Order;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -19,8 +20,9 @@ class OrderCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        // Hanya ke channel privat khusus order (publik dinonaktifkan)
+        // Dual broadcast: publik 'orders' untuk driver, privat 'orders.{id}' untuk customer
         return [
+            new Channel('orders'),
             new PrivateChannel('orders.' . $this->order->id),
         ];
     }

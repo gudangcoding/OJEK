@@ -12,6 +12,10 @@ class ApiService {
   int? _userId;
   int? get userId => _userId;
 
+  void setUserId(int? id) {
+    _userId = id;
+  }
+
   // Menghapus token lokal tanpa memanggil backend
   void clearToken() {
     _token = null;

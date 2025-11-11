@@ -12,8 +12,12 @@ class BroadcastService {
   String? _token;
 
   Future<void> init({String? token}) async {
+    // Selalu perbarui token meskipun sudah initialized,
+    // agar authorizer private channel memakai token terbaru.
+    if (token != null) {
+      _token = token;
+    }
     if (_initialized) return;
-    _token = token;
     await _pusher.init(
       apiKey: AppConfig.pusherKey,
       cluster: AppConfig.pusherCluster,

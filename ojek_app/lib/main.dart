@@ -20,8 +20,10 @@ Future<void> main() async {
   try {
     final token = await AuthStorage.getToken();
     final role = await AuthStorage.getRole();
+    final userId = await AuthStorage.getUserId();
     if (token != null && token.isNotEmpty) {
       api.setAuth(token, role: role ?? '');
+      api.setUserId(userId);
     }
   } catch (_) {
     // abaikan, akan dianggap belum login

@@ -98,6 +98,18 @@ Ilustrasi:
 - Driver juga menerima penawaran tertarget via kanal privat `private-users.{id}` (opsional/configurable).
 - Frontend berlangganan kanal melalui `BroadcastService`/`RealtimeService` dan menggunakan token Bearer untuk authorizer.
 
+## Dokumentasi API (Scramble)
+- URL: `http://localhost:8000/docs/api#/`
+- Klik tombol `Authorize` di pojok kanan atas, pilih skema `bearer`, lalu tempel token Sanctum hasil `POST /api/login` (tanpa awalan `Bearer `).
+- Konfigurasi security global untuk bearer sudah diatur di `AppServiceProvider`:
+  ```php
+  Scramble::configure()
+      ->withDocumentTransformers(function (OpenApi $openApi) {
+          $openApi->secure(SecurityScheme::http('bearer'));
+      });
+  ```
+- Jika halaman docs tidak muncul, pastikan paket `dedoc/scramble` terpasang, service provider aktif, dan environment pengembangan berjalan pada `http://localhost:8000`.
+
 ## Struktur Modul
 
 **Frontend (Flutter `ojek_app/lib`)**
